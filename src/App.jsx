@@ -3,16 +3,14 @@ import Dashboard from './pages/dashboard';
 import Login from './pages/login';
 
 function App() {
-  const token = localStorage.getItem('adminToken');
-
+  // IMPORTANT: Don't check localStorage in App.jsx on initial render
+  // It causes hydration mismatch on server vs client
   return (
     <BrowserRouter>
       <Routes>
-        {/* If already logged in → go to dashboard */}
-        <Route path="/" element={token ? <Dashboard /> : <Navigate to="/login" />} />
-        
-        {/* Login page */}
-        <Route path="/login" element={token ? <Navigate to="/" /> : <Login />} />
+        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/dashboard" element={<Dashboard />} />
       </Routes>
     </BrowserRouter>
   );

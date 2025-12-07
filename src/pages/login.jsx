@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom'; // Add this
 import { 
   Eye, 
   EyeOff, 
@@ -18,6 +19,7 @@ import '../styles/login.css';
 import api from '../services/api'; // Make sure this path is correct
 
 export default function Login() {
+  const navigate = useNavigate(); // Add this hook
   const [rollNo, setRollNo] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -26,6 +28,12 @@ export default function Login() {
   const [toast, setToast] = useState({ show: false, message: '', type: '' });
 
   useEffect(() => {
+    // Check if user is already logged in
+    const token = localStorage.getItem('adminToken');
+    if (token) {
+      navigate('/dashboard');
+    }
+
     const savedRememberMe = sessionStorage.getItem('rememberMe');
     if (savedRememberMe === 'true') {
       setRememberMe(true);
@@ -34,14 +42,14 @@ export default function Login() {
         setRollNo(savedRollNo);
       }
     }
-  }, []);
+  }, [navigate]);
 
   const showToast = (message, type = 'error') => {
     setToast({ show: true, message, type });
     setTimeout(() => setToast({ show: false, message: '', type: '' }), 4000);
   };
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (!rollNo.trim() || !password.trim()) {
       showToast('Please fill in all fields', 'error');
       return;
@@ -49,12 +57,13 @@ export default function Login() {
 
     setLoading(true);
     
-    // Option 1: Use real API (recommended)
-    api.post('/api/admin/login', {
-      adminId: rollNo.trim(),
-      password: password
-    })
-    .then(response => {
+    try {
+      // Option 1: Use real API (recommended)
+      const response = await api.post('/api/admin/login', {
+        adminId: rollNo.trim(),
+        password: password
+      });
+
       const { token, admin } = response.data;
       
       // Store token
@@ -71,17 +80,24 @@ export default function Login() {
       
       showToast('Authentication successful! Redirecting...', 'success');
       
-      // Redirect to dashboard
+      // Redirect to dashboard using navigate
       setTimeout(() => {
-        window.location.href = '/dashboard';
+        navigate('/dashboard');
       }, 1500);
-    })
-    .catch(error => {
+      
+    } catch (error) {
       console.error('Login error:', error);
       
-      // Fallback to demo mode if API fails
+      // Fallback to demo mode if API fails or for testing
       if (rollNo.trim() === 'ADM001' && password === 'admin123') {
         // Demo mode success
+        localStorage.setItem('adminToken', 'demo-token-for-testing');
+        localStorage.setItem('adminData', JSON.stringify({ 
+          adminId: 'ADM001', 
+          name: 'Demo Admin',
+          role: 'Administrator'
+        }));
+        
         if (rememberMe) {
           sessionStorage.setItem('rememberMe', 'true');
           sessionStorage.setItem('savedRollNo', rollNo.trim());
@@ -89,10 +105,11 @@ export default function Login() {
           sessionStorage.removeItem('rememberMe');
           sessionStorage.removeItem('savedRollNo');
         }
+        
         showToast('Demo: Authentication successful! Redirecting...', 'success');
         
         setTimeout(() => {
-          window.location.href = '/dashboard';
+          navigate('/dashboard');
         }, 1500);
       } else {
         showToast(
@@ -101,10 +118,9 @@ export default function Login() {
         );
         setPassword('');
       }
-    })
-    .finally(() => {
+    } finally {
       setLoading(false);
-    });
+    }
   };
 
   const handleKeyPress = (e) => {
