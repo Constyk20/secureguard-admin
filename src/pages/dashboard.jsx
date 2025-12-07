@@ -18,6 +18,7 @@ import toast, { Toaster } from 'react-hot-toast';
 import api from '../services/api';
 import DeviceCard from '../components/DeviceCard';
 import Header from '../components/Header';
+import '../styles/dashboard.css'; // Import the CSS file
 
 export default function Dashboard() {
   const [devices, setDevices] = useState([]);
@@ -103,16 +104,10 @@ export default function Dashboard() {
   const offlineDevices = total - onlineDevices;
   const lockedDevices = devices.filter(d => d.isLocked).length;
 
-  const getComplianceColor = (rate) => {
-    if (rate >= 90) return 'from-green-500 to-emerald-600';
-    if (rate >= 70) return 'from-amber-500 to-orange-600';
-    return 'from-red-500 to-rose-600';
-  };
-
-  const getConnectionStatusColor = (rate) => {
-    if (rate >= 80) return 'from-blue-500 to-indigo-600';
-    if (rate >= 60) return 'from-cyan-500 to-sky-600';
-    return 'from-gray-500 to-slate-600';
+  const getComplianceCardClass = (rate) => {
+    if (rate >= 90) return 'compliance-card';
+    if (rate >= 70) return 'connection-card';
+    return 'at-risk-card';
   };
 
   const formatLastUpdate = (date) => {
@@ -141,6 +136,7 @@ export default function Dashboard() {
             fontWeight: '500',
           },
           success: {
+            className: 'toast-success',
             iconTheme: {
               primary: '#10b981',
               secondary: 'white',
@@ -151,6 +147,7 @@ export default function Dashboard() {
             },
           },
           error: {
+            className: 'toast-error',
             iconTheme: {
               primary: '#ef4444',
               secondary: 'white',
@@ -164,7 +161,7 @@ export default function Dashboard() {
       />
       <Header />
 
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-50 to-gray-100">
+      <div className="dashboard-container">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Header Section */}
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8">
@@ -173,7 +170,7 @@ export default function Dashboard() {
                 <div className="p-2 bg-gradient-to-br from-red-600 to-red-700 rounded-xl shadow-lg">
                   <Shield className="text-white" size={24} />
                 </div>
-                <h1 className="text-3xl font-bold text-gray-900">Device Management Dashboard</h1>
+                <h1 className="text-3xl font-bold gradient-text">Device Management Dashboard</h1>
               </div>
               <p className="text-gray-600 flex items-center gap-2">
                 <Activity size={16} className="text-green-500 animate-pulse" />
@@ -191,23 +188,23 @@ export default function Dashboard() {
             
             <div className="flex items-center gap-3 mt-4 lg:mt-0">
               {/* Search Input */}
-              <div className="relative flex-1 max-w-md">
+              <div className="search-input-container flex-1 max-w-md">
                 <input
                   type="text"
                   placeholder="Search devices..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm"
+                  className="search-input"
                 />
-                <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
-                  <Smartphone size={16} className="text-gray-400" />
+                <div className="search-icon">
+                  <Smartphone size={16} />
                 </div>
               </div>
               
               <button
                 onClick={() => fetchDevices(true)}
                 disabled={refreshing}
-                className="px-5 py-2.5 bg-gradient-to-r from-gray-900 to-gray-800 text-white rounded-xl font-semibold hover:from-gray-800 hover:to-gray-700 transition-all duration-200 flex items-center gap-2 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                className="refresh-button"
               >
                 <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
                 {refreshing ? 'Refreshing...' : 'Refresh'}
@@ -216,7 +213,7 @@ export default function Dashboard() {
           </div>
 
           {/* Tabs */}
-          <div className="flex gap-2 mb-6 p-1 bg-gray-100 rounded-xl w-fit">
+          <div className="tabs-container mb-6 w-fit">
             {[
               { id: 'all', label: 'All Devices', count: total },
               { id: 'compliant', label: 'Compliant', count: compliant },
@@ -225,18 +222,10 @@ export default function Dashboard() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-5 py-2 rounded-lg font-medium transition-all duration-200 flex items-center gap-2 ${
-                  activeTab === tab.id
-                    ? 'bg-white text-gray-900 shadow-md'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
+                className={`tab-button ${activeTab === tab.id ? 'active' : ''}`}
               >
                 <span>{tab.label}</span>
-                <span className={`px-2 py-0.5 text-xs rounded-full ${
-                  activeTab === tab.id
-                    ? 'bg-red-100 text-red-700'
-                    : 'bg-gray-200 text-gray-700'
-                }`}>
+                <span className="tab-badge">
                   {tab.count}
                 </span>
               </button>
@@ -246,34 +235,34 @@ export default function Dashboard() {
           {/* Stats Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
             {/* Total Devices */}
-            <div className="bg-gradient-to-br from-white to-gray-50 p-6 rounded-2xl shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300 group hover:scale-[1.02]">
+            <div className="stats-card hover-scale">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-gray-600 text-sm font-semibold uppercase tracking-wide mb-1">Total Devices</p>
-                  <p className="text-4xl font-bold text-gray-900 mb-2">{total}</p>
+                  <p className="stats-card-value mb-2">{total}</p>
                   <div className="flex items-center gap-2 text-sm">
                     <div className="flex items-center gap-1">
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <div className="status-dot compliant"></div>
                       <span className="text-gray-700">{compliant} compliant</span>
                     </div>
                   </div>
                 </div>
-                <div className="p-3 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl group-hover:rotate-12 transition-transform duration-300">
+                <div className="stats-card-icon hover-rotate">
                   <Users size={28} className="text-blue-600" />
                 </div>
               </div>
             </div>
 
             {/* Compliance Rate */}
-            <div className={`bg-gradient-to-br ${getComplianceColor(complianceRate)} p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 group hover:scale-[1.02]`}>
+            <div className={`stats-card ${getComplianceCardClass(complianceRate)} hover-scale`}>
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-white text-opacity-90 text-sm font-semibold uppercase tracking-wide mb-1">Compliance Rate</p>
                   <p className="text-4xl font-bold text-white mb-2">{complianceRate}%</p>
                   <div className="flex items-center gap-2">
-                    <div className="w-20 bg-white bg-opacity-30 rounded-full h-2">
+                    <div className="progress-bar w-20">
                       <div 
-                        className="bg-white h-2 rounded-full transition-all duration-700" 
+                        className="progress-bar-fill" 
                         style={{ width: `${complianceRate}%` }}
                       ></div>
                     </div>
@@ -282,38 +271,38 @@ export default function Dashboard() {
                     </span>
                   </div>
                 </div>
-                <div className="p-3 bg-white bg-opacity-20 rounded-xl group-hover:rotate-12 transition-transform duration-300">
+                <div className="p-3 bg-white bg-opacity-20 rounded-xl hover-rotate">
                   <Shield size={28} className="text-white" />
                 </div>
               </div>
             </div>
 
             {/* Connection Status */}
-            <div className="bg-gradient-to-br from-white to-gray-50 p-6 rounded-2xl shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300 group hover:scale-[1.02]">
+            <div className="stats-card hover-scale">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-gray-600 text-sm font-semibold uppercase tracking-wide mb-1">Connection Status</p>
                   <p className="text-4xl font-bold text-gray-900 mb-2">{onlineDevices}/{total}</p>
                   <div className="flex items-center gap-2 text-sm">
                     <div className="flex items-center gap-1">
-                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                      <div className="status-dot online"></div>
                       <span className="text-gray-700">{onlineDevices} online</span>
                     </div>
                     <span className="text-gray-400">•</span>
                     <div className="flex items-center gap-1">
-                      <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                      <div className="status-dot offline"></div>
                       <span className="text-gray-700">{offlineDevices} offline</span>
                     </div>
                   </div>
                 </div>
-                <div className="p-3 bg-gradient-to-br from-green-100 to-emerald-200 rounded-xl group-hover:rotate-12 transition-transform duration-300">
+                <div className="p-3 bg-gradient-to-br from-green-100 to-emerald-200 rounded-xl hover-rotate">
                   <Wifi size={28} className="text-green-600" />
                 </div>
               </div>
             </div>
 
             {/* Locked Devices */}
-            <div className="bg-gradient-to-br from-white to-gray-50 p-6 rounded-2xl shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300 group hover:scale-[1.02]">
+            <div className="stats-card hover-scale">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-gray-600 text-sm font-semibold uppercase tracking-wide mb-1">Locked Devices</p>
@@ -322,7 +311,7 @@ export default function Dashboard() {
                     {lockedDevices === 0 ? 'All devices operational' : 'Requires attention'}
                   </p>
                 </div>
-                <div className="p-3 bg-gradient-to-br from-red-100 to-rose-200 rounded-xl group-hover:rotate-12 transition-transform duration-300">
+                <div className="p-3 bg-gradient-to-br from-red-100 to-rose-200 rounded-xl hover-rotate">
                   <ShieldAlert size={28} className="text-red-600" />
                 </div>
               </div>
@@ -331,7 +320,7 @@ export default function Dashboard() {
 
           {/* Devices Section */}
           <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
+            <div className="card-header px-6 py-4">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="text-xl font-bold text-gray-900">
@@ -348,11 +337,11 @@ export default function Dashboard() {
                 <div className="flex items-center gap-4 mt-3 sm:mt-0">
                   <div className="flex items-center gap-4 text-sm font-medium">
                     <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 bg-gradient-to-r from-green-500 to-emerald-600 rounded-full"></div>
+                      <div className="status-dot compliant"></div>
                       <span className="text-gray-700">Compliant</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 bg-gradient-to-r from-red-500 to-rose-600 rounded-full animate-pulse"></div>
+                      <div className="status-dot at-risk"></div>
                       <span className="text-gray-700">At Risk</span>
                     </div>
                   </div>
@@ -362,10 +351,10 @@ export default function Dashboard() {
 
             <div className="p-6">
               {loading ? (
-                <div className="text-center py-20">
+                <div className="empty-state">
                   <div className="inline-flex flex-col items-center gap-6">
                     <div className="relative">
-                      <div className="w-20 h-20 border-4 border-red-200 border-t-red-600 rounded-full animate-spin"></div>
+                      <div className="loading-spinner w-20 h-20"></div>
                       <Smartphone className="absolute inset-0 m-auto text-red-600" size={32} />
                     </div>
                     <div>
@@ -379,15 +368,15 @@ export default function Dashboard() {
               ) : (
                 <>
                   {filteredDevices.length > 0 ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                    <div className="devices-grid">
                       {filteredDevices.map(device => (
                         <DeviceCard key={device._id || device.deviceId} device={device} refresh={fetchDevices} />
                       ))}
                     </div>
                   ) : (
-                    <div className="text-center py-20">
+                    <div className="empty-state">
                       <div className="inline-flex flex-col items-center gap-6 max-w-md mx-auto">
-                        <div className="p-5 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl shadow-inner">
+                        <div className="empty-state-icon">
                           <Smartphone size={56} className="text-gray-400" />
                         </div>
                         <div>
@@ -418,7 +407,7 @@ export default function Dashboard() {
           </div>
 
           {/* Footer Info */}
-          <div className="mt-8 p-6 bg-gradient-to-r from-gray-900 to-gray-800 rounded-2xl shadow-lg">
+          <div className="dashboard-footer mt-8">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-white bg-opacity-10 rounded-lg">
