@@ -15,6 +15,7 @@ import {
   Zap
 } from 'lucide-react';
 import '../styles/login.css';
+import api from '../api/axios'; // Make sure this path is correct
 
 export default function Login() {
   const [rollNo, setRollNo] = useState('');
@@ -48,8 +49,39 @@ export default function Login() {
 
     setLoading(true);
     
-    setTimeout(() => {
+    // Option 1: Use real API (recommended)
+    api.post('/api/admin/login', {
+      adminId: rollNo.trim(),
+      password: password
+    })
+    .then(response => {
+      const { token, admin } = response.data;
+      
+      // Store token
+      localStorage.setItem('adminToken', token);
+      localStorage.setItem('adminData', JSON.stringify(admin));
+      
+      if (rememberMe) {
+        sessionStorage.setItem('rememberMe', 'true');
+        sessionStorage.setItem('savedRollNo', rollNo.trim());
+      } else {
+        sessionStorage.removeItem('rememberMe');
+        sessionStorage.removeItem('savedRollNo');
+      }
+      
+      showToast('Authentication successful! Redirecting...', 'success');
+      
+      // Redirect to dashboard
+      setTimeout(() => {
+        window.location.href = '/dashboard';
+      }, 1500);
+    })
+    .catch(error => {
+      console.error('Login error:', error);
+      
+      // Fallback to demo mode if API fails
       if (rollNo.trim() === 'ADM001' && password === 'admin123') {
+        // Demo mode success
         if (rememberMe) {
           sessionStorage.setItem('rememberMe', 'true');
           sessionStorage.setItem('savedRollNo', rollNo.trim());
@@ -57,18 +89,22 @@ export default function Login() {
           sessionStorage.removeItem('rememberMe');
           sessionStorage.removeItem('savedRollNo');
         }
-        showToast('Authentication successful! Redirecting...', 'success');
+        showToast('Demo: Authentication successful! Redirecting...', 'success');
+        
         setTimeout(() => {
-          // Add your actual redirect logic here
-          console.log('Redirecting to dashboard...');
-          // window.location.href = '/dashboard';
+          window.location.href = '/dashboard';
         }, 1500);
       } else {
-        showToast('Authentication failed. Please check your credentials.', 'error');
+        showToast(
+          error.response?.data?.message || 'Authentication failed. Please check your credentials.',
+          'error'
+        );
         setPassword('');
       }
+    })
+    .finally(() => {
       setLoading(false);
-    }, 1500);
+    });
   };
 
   const handleKeyPress = (e) => {
