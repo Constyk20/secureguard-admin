@@ -15,7 +15,7 @@ import {
   Zap
 } from 'lucide-react';
 import '../styles/login.css';
-import api from '../api/axios'; // Make sure this path is correct
+import api from '../services/api'; // Make sure this path is correct
 
 export default function Login() {
   const [rollNo, setRollNo] = useState('');
