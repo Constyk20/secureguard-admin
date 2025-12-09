@@ -1,56 +1,71 @@
-/* index.css */
+/* Global Reset */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
+/* Root Variables */
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* FIX: Remove flex from body and make it full width */
+/* Body - Full Width, No Centering */
 body {
   margin: 0;
   padding: 0;
   width: 100%;
   min-height: 100vh;
-  /* Remove these lines: */
-  /* display: flex; */
-  /* place-items: center; */
-  /* min-width: 320px; */
+  background-color: #f5f5f5;
+  color: #333;
 }
 
-/* FIX: Make root full width */
+/* Root Container - Full Width */
 #root {
   width: 100%;
   min-height: 100vh;
 }
 
-/* Your existing styles below */
+/* Links */
 a {
   font-weight: 500;
   color: #646cff;
   text-decoration: inherit;
+  transition: color 0.25s;
 }
+
 a:hover {
   color: #535bf2;
 }
 
+/* Headings */
 h1 {
-  font-size: 3.2em;
+  font-size: 2.5em;
   line-height: 1.1;
+  font-weight: 600;
 }
 
+h2 {
+  font-size: 2em;
+  line-height: 1.2;
+  font-weight: 600;
+}
+
+h3 {
+  font-size: 1.5em;
+  line-height: 1.3;
+  font-weight: 600;
+}
+
+/* Buttons */
 button {
   border-radius: 8px;
   border: 1px solid transparent;
@@ -59,27 +74,149 @@ button {
   font-weight: 500;
   font-family: inherit;
   background-color: #1a1a1a;
+  color: white;
   cursor: pointer;
-  transition: border-color 0.25s;
+  transition: all 0.25s;
 }
+
 button:hover {
   border-color: #646cff;
+  background-color: #2a2a2a;
 }
+
 button:focus,
 button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  outline: 2px solid #646cff;
+  outline-offset: 2px;
 }
 
-@media (prefers-color-scheme: light) {
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Input Fields */
+input,
+textarea,
+select {
+  font-family: inherit;
+  font-size: 1em;
+  padding: 0.6em;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  transition: border-color 0.25s;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: #646cff;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Utility Classes */
+.container {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.text-left {
+  text-align: left;
+}
+
+.text-right {
+  text-align: right;
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
   :root {
-    color: #213547;
-    background-color: #ffffff;
+    color-scheme: dark;
   }
-  a:hover {
-    color: #747bff;
+  
+  body {
+    background-color: #1a1a1a;
+    color: rgba(255, 255, 255, 0.87);
   }
+  
+  input,
+  textarea,
+  select {
+    background-color: #2a2a2a;
+    color: white;
+    border-color: #444;
+  }
+  
   button {
-    background-color: #f9f9f9;
+    background-color: #2a2a2a;
+  }
+  
+  button:hover {
+    background-color: #3a3a3a;
   }
 }
 
+/* Responsive Typography */
+@media (max-width: 768px) {
+  h1 {
+    font-size: 2em;
+  }
+  
+  h2 {
+    font-size: 1.5em;
+  }
+  
+  h3 {
+    font-size: 1.25em;
+  }
+}
+
+/* Loading Spinner */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+/* Fade In Animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-in;
+}
