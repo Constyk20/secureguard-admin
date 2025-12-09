@@ -26,15 +26,30 @@ export default function Dashboard() {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [activeTab, setActiveTab] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [error, setError] = useState(null);
 
   const fetchDevices = async (showToast = false) => {
     if (showToast) setRefreshing(true);
+    setError(null);
     
     try {
+      console.log('🔄 Fetching devices from API...');
+      console.log('📍 API URL:', import.meta.env.VITE_API_URL);
+      console.log('🔑 Token exists:', !!localStorage.getItem('adminToken'));
+      
       const res = await api.get('/api/admin/devices');
+      
+      console.log('✅ API Response:', res);
+      console.log('📦 Response data:', res.data);
       
       // Handle both response formats
       const devicesData = res.data.success ? res.data.data : res.data;
+      
+      console.log('📱 Devices data:', devicesData);
+      
+      if (!Array.isArray(devicesData)) {
+        throw new Error('Invalid response format: devices data is not an array');
+      }
       
       const sortedDevices = devicesData.sort((a, b) => {
         if (a.isCompliant !== b.isCompliant) {
@@ -49,8 +64,18 @@ export default function Dashboard() {
       if (showToast) {
         toast.success(`${sortedDevices.length} devices updated`);
       }
+      
+      console.log('✅ Devices loaded successfully:', sortedDevices.length);
     } catch (err) {
-      console.error('Fetch devices error:', err);
+      console.error('❌ Fetch devices error:', err);
+      console.error('❌ Error details:', {
+        message: err.message,
+        status: err.status,
+        response: err.response
+      });
+      
+      setError(err.message || 'Failed to load devices');
+      
       if (err.status === 401) {
         toast.error('Session expired. Please login again.');
         setTimeout(() => {
@@ -59,7 +84,15 @@ export default function Dashboard() {
         }, 1500);
         return;
       }
-      toast.error(err.message || 'Failed to load devices');
+      
+      // Show specific error message
+      if (err.status === 0) {
+        toast.error('Cannot connect to server. Please check if backend is running.');
+      } else if (err.status === 403) {
+        toast.error('Access denied. Admin privileges required.');
+      } else {
+        toast.error(err.message || 'Failed to load devices');
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -68,12 +101,18 @@ export default function Dashboard() {
 
   useEffect(() => {
     const token = localStorage.getItem('adminToken');
+    console.log('🔐 Checking authentication...');
+    console.log('🔑 Token:', token ? 'Present' : 'Missing');
+    
     if (!token) {
+      console.log('❌ No token found, redirecting to login...');
       window.location.href = '/login';
       return;
     }
     
+    console.log('✅ Token found, fetching devices...');
     fetchDevices();
+    
     const interval = setInterval(fetchDevices, 8000);
     return () => clearInterval(interval);
   }, []);
@@ -163,6 +202,26 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+
+        {/* Debug Info (Remove in production) */}
+        {process.env.NODE_ENV === 'development' && error && (
+          <div style={{
+            background: '#fee',
+            border: '1px solid #fcc',
+            padding: '1rem',
+            borderRadius: '0.5rem',
+            marginBottom: '1rem'
+          }}>
+            <strong>Debug Info:</strong>
+            <pre style={{ fontSize: '0.75rem', marginTop: '0.5rem' }}>
+              {JSON.stringify({
+                error,
+                apiUrl: import.meta.env.VITE_API_URL,
+                hasToken: !!localStorage.getItem('adminToken')
+              }, null, 2)}
+            </pre>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="tabs-container">
@@ -312,6 +371,20 @@ export default function Dashboard() {
                   <p className="loading-subtitle">Fetching real-time device data...</p>
                 </div>
               </div>
+            ) : error ? (
+              <div className="empty-state">
+                <div className="empty-state-icon">
+                  <AlertTriangle size={48} className="text-red-500" />
+                </div>
+                <h3 className="empty-state-title">Connection Error</h3>
+                <p className="empty-state-description">{error}</p>
+                <button
+                  onClick={() => fetchDevices(true)}
+                  className="clear-search-button"
+                >
+                  Try Again
+                </button>
+              </div>
             ) : filteredDevices.length > 0 ? (
               <div className="devices-grid">
                 {filteredDevices.map(device => (
@@ -358,7 +431,9 @@ export default function Dashboard() {
               </div>
               <div>
                 <p className="footer-title">SecureGuard Network Status</p>
-                <p className="footer-subtitle">All systems operational</p>
+                <p className="footer-subtitle">
+                  {error ? 'Connection issues detected' : 'All systems operational'}
+                </p>
               </div>
             </div>
             
