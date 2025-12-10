@@ -27,6 +27,13 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState(null);
+  const [stats, setStats] = useState({
+    totalDevices: 0,
+    activeDevices: 0,
+    lockdownDevices: 0,
+    offlineDevices: 0,
+    complianceRate: 0
+  });
 
   const fetchDevices = async (showToast = false) => {
     if (showToast) setRefreshing(true);
@@ -35,46 +42,89 @@ export default function Dashboard() {
     try {
       console.log('🔄 Fetching devices from API...');
       console.log('📍 API URL:', import.meta.env.VITE_API_URL);
-      console.log('🔑 Token exists:', !!localStorage.getItem('adminToken'));
+      console.log('🔑 Token:', localStorage.getItem('adminToken')?.substring(0, 20) + '...');
       
+      // Try to get stats first
+      const statsRes = await api.get('/api/admin/stats');
+      console.log('📊 Stats response:', statsRes.data);
+      
+      if (statsRes.data.success) {
+        setStats(statsRes.data.stats);
+      }
+      
+      // Get devices
       const res = await api.get('/api/admin/devices');
       
-      console.log('✅ API Response:', res);
-      console.log('📦 Response data:', res.data);
-      
-      // Handle both response formats
-      const devicesData = res.data.success ? res.data.data : res.data;
-      
-      console.log('📱 Devices data:', devicesData);
-      
-      if (!Array.isArray(devicesData)) {
-        throw new Error('Invalid response format: devices data is not an array');
-      }
-      
-      const sortedDevices = devicesData.sort((a, b) => {
-        if (a.isCompliant !== b.isCompliant) {
-          return a.isCompliant ? 1 : -1;
-        }
-        return new Date(b.lastChecked) - new Date(a.lastChecked);
+      console.log('✅ Devices API Response:', res);
+      console.log('📦 Response structure:', {
+        success: res.data.success,
+        count: res.data.count,
+        hasDevices: !!res.data.devices,
+        devicesLength: res.data.devices?.length
       });
       
-      setDevices(sortedDevices);
-      setLastUpdated(new Date());
+      let devicesData = [];
       
-      if (showToast) {
-        toast.success(`${sortedDevices.length} devices updated`);
+      // Handle different response formats
+      if (res.data.success && res.data.devices) {
+        devicesData = res.data.devices;
+      } else if (Array.isArray(res.data)) {
+        devicesData = res.data;
+      } else if (res.data.data && Array.isArray(res.data.data)) {
+        devicesData = res.data.data;
+      } else {
+        console.warn('⚠️ Unexpected response format:', res.data);
+        devicesData = [];
       }
       
-      console.log('✅ Devices loaded successfully:', sortedDevices.length);
+      console.log('📱 Processed devices:', devicesData.length);
+      
+      if (devicesData.length > 0) {
+        // Map the backend device format to frontend format
+        const mappedDevices = devicesData.map(device => ({
+          id: device._id || device.id,
+          deviceId: device._id || device.id,
+          name: device.name || `Device-${(device._id || '').substring(0, 8)}`,
+          status: device.status || 'offline',
+          isCompliant: device.status === 'active' && (!device.lockdown || !device.lockdown.active),
+          isConnected: device.status === 'active' || device.status === 'lockdown',
+          isLocked: device.lockdown?.active || false,
+          lastChecked: device.lastSeen || new Date(),
+          deviceModel: device.model || 'Unknown',
+          osVersion: device.osVersion || 'Unknown',
+          battery: device.battery?.level || 0,
+          location: device.location,
+          user: device.user || { name: 'Unknown', rollNo: 'Unknown' },
+          lockdown: device.lockdown || { active: false, reason: '' }
+        }));
+        
+        setDevices(mappedDevices);
+        setLastUpdated(new Date());
+        
+        if (showToast) {
+          toast.success(`${mappedDevices.length} devices loaded`);
+        }
+        
+        console.log('✅ Devices loaded successfully');
+      } else {
+        console.log('ℹ️ No devices found in response');
+        setDevices([]);
+        if (showToast) {
+          toast.info('No devices registered yet');
+        }
+      }
+      
     } catch (err) {
       console.error('❌ Fetch devices error:', err);
-      console.error('❌ Error details:', {
+      console.error('❌ Full error:', {
         message: err.message,
+        code: err.code,
         status: err.status,
-        response: err.response
+        response: err.response?.data
       });
       
-      setError(err.message || 'Failed to load devices');
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to load devices';
+      setError(errorMessage);
       
       if (err.status === 401) {
         toast.error('Session expired. Please login again.');
@@ -85,13 +135,22 @@ export default function Dashboard() {
         return;
       }
       
-      // Show specific error message
-      if (err.status === 0) {
-        toast.error('Cannot connect to server. Please check if backend is running.');
+      // Network errors
+      if (err.message?.includes('Network Error') || err.status === 0) {
+        toast.error(
+          <div>
+            <strong>Cannot connect to backend server</strong>
+            <br />
+            <small>Please check if backend is running at: {import.meta.env.VITE_API_URL}</small>
+          </div>,
+          { duration: 5000 }
+        );
       } else if (err.status === 403) {
         toast.error('Access denied. Admin privileges required.');
+      } else if (err.status === 404) {
+        toast.error('API endpoint not found. Check backend routes.');
       } else {
-        toast.error(err.message || 'Failed to load devices');
+        toast.error(`Error: ${errorMessage}`);
       }
     } finally {
       setLoading(false);
@@ -101,29 +160,57 @@ export default function Dashboard() {
 
   useEffect(() => {
     const token = localStorage.getItem('adminToken');
-    console.log('🔐 Checking authentication...');
-    console.log('🔑 Token:', token ? 'Present' : 'Missing');
+    console.log('🔐 Initial dashboard load...');
     
     if (!token) {
-      console.log('❌ No token found, redirecting to login...');
-      window.location.href = '/login';
+      console.log('❌ No token found, redirecting to login');
+      toast.error('Please login first');
+      setTimeout(() => {
+        window.location.href = '/login';
+      }, 1000);
       return;
     }
     
-    console.log('✅ Token found, fetching devices...');
-    fetchDevices();
+    // Test connection first
+    const testConnection = async () => {
+      try {
+        console.log('🔌 Testing backend connection...');
+        const testRes = await api.get('/health');
+        console.log('✅ Backend connection successful:', testRes.data);
+        fetchDevices();
+      } catch (err) {
+        console.error('❌ Backend connection failed:', err);
+        setError('Backend server is not responding. Please check if it\'s running.');
+        toast.error(
+          <div>
+            <strong>Backend server not reachable</strong>
+            <br />
+            <small>Check: {import.meta.env.VITE_API_URL}/health</small>
+          </div>,
+          { duration: 10000 }
+        );
+      }
+    };
     
-    const interval = setInterval(fetchDevices, 8000);
+    testConnection();
+    
+    // Refresh every 30 seconds instead of 8
+    const interval = setInterval(() => {
+      if (!loading && !refreshing) {
+        fetchDevices();
+      }
+    }, 30000);
+    
     return () => clearInterval(interval);
   }, []);
 
   const filteredDevices = devices.filter(device => {
     const matchesSearch = 
-      device.deviceId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      device.deviceModel?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      device.osVersion?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      device.user?.rollNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      device.user?.name?.toLowerCase().includes(searchTerm.toLowerCase());
+      (device.deviceId?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+      (device.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+      (device.deviceModel?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+      (device.user?.rollNo?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+      (device.user?.name?.toLowerCase() || '').includes(searchTerm.toLowerCase());
     
     if (!matchesSearch) return false;
     
@@ -132,13 +219,13 @@ export default function Dashboard() {
     return true;
   });
 
-  const total = devices.length;
+  const total = stats.totalDevices || devices.length;
   const compliant = devices.filter(d => d.isCompliant).length;
   const nonCompliant = total - compliant;
   const complianceRate = total > 0 ? Math.round((compliant / total) * 100) : 0;
-  const onlineDevices = devices.filter(d => d.isConnected).length;
-  const offlineDevices = total - onlineDevices;
-  const lockedDevices = devices.filter(d => d.isLocked).length;
+  const onlineDevices = stats.activeDevices || devices.filter(d => d.isConnected).length;
+  const offlineDevices = stats.offlineDevices || total - onlineDevices;
+  const lockedDevices = stats.lockdownDevices || devices.filter(d => d.isLocked).length;
 
   const getComplianceCardClass = (rate) => {
     if (rate >= 90) return 'compliance-card';
@@ -163,6 +250,21 @@ export default function Dashboard() {
       <Header />
 
       <div className="dashboard-content">
+        {/* Debug Connection Status */}
+        <div className="connection-status-banner">
+          <div className="connection-status-content">
+            <div className={`status-indicator ${error ? 'error' : 'success'}`}></div>
+            <span>
+              {error ? `Connection Error: ${error}` : 'Connected to backend'}
+            </span>
+            {import.meta.env.VITE_API_URL && (
+              <small className="api-url">
+                API: {import.meta.env.VITE_API_URL}
+              </small>
+            )}
+          </div>
+        </div>
+
         {/* Header Section */}
         <div className="dashboard-header-section">
           <div className="header-content">
@@ -199,27 +301,52 @@ export default function Dashboard() {
                 <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
                 {refreshing ? 'Refreshing...' : 'Refresh'}
               </button>
+              
+              <button
+                onClick={() => {
+                  localStorage.removeItem('adminToken');
+                  window.location.href = '/login';
+                }}
+                className="logout-button"
+              >
+                Logout
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Debug Info (Remove in production) */}
-        {process.env.NODE_ENV === 'development' && error && (
-          <div style={{
-            background: '#fee',
-            border: '1px solid #fcc',
-            padding: '1rem',
-            borderRadius: '0.5rem',
-            marginBottom: '1rem'
-          }}>
-            <strong>Debug Info:</strong>
-            <pre style={{ fontSize: '0.75rem', marginTop: '0.5rem' }}>
-              {JSON.stringify({
-                error,
-                apiUrl: import.meta.env.VITE_API_URL,
-                hasToken: !!localStorage.getItem('adminToken')
-              }, null, 2)}
-            </pre>
+        {/* Connection Test Button (Dev only) */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="dev-tools">
+            <button
+              onClick={async () => {
+                try {
+                  const test = await api.get('/health');
+                  console.log('✅ Health check:', test.data);
+                  toast.success(`Backend OK: ${test.data.environment}`);
+                } catch (err) {
+                  console.error('❌ Health check failed:', err);
+                  toast.error(`Health check failed: ${err.message}`);
+                }
+              }}
+              className="test-button"
+            >
+              Test Backend Connection
+            </button>
+            <button
+              onClick={() => {
+                console.log('Current state:', {
+                  devices,
+                  stats,
+                  apiUrl: import.meta.env.VITE_API_URL,
+                  token: localStorage.getItem('adminToken')?.substring(0, 20)
+                });
+                toast.success('State logged to console');
+              }}
+              className="test-button"
+            >
+              Log State
+            </button>
           </div>
         )}
 
@@ -368,7 +495,7 @@ export default function Dashboard() {
                 <div className="loading-spinner"></div>
                 <div>
                   <p className="loading-title">Loading Devices</p>
-                  <p className="loading-subtitle">Fetching real-time device data...</p>
+                  <p className="loading-subtitle">Connecting to backend...</p>
                 </div>
               </div>
             ) : error ? (
@@ -377,19 +504,32 @@ export default function Dashboard() {
                   <AlertTriangle size={48} className="text-red-500" />
                 </div>
                 <h3 className="empty-state-title">Connection Error</h3>
-                <p className="empty-state-description">{error}</p>
-                <button
-                  onClick={() => fetchDevices(true)}
-                  className="clear-search-button"
-                >
-                  Try Again
-                </button>
+                <p className="empty-state-description">
+                  Cannot connect to backend server at:<br />
+                  <code>{import.meta.env.VITE_API_URL}</code>
+                </p>
+                <div className="empty-state-actions">
+                  <button
+                    onClick={() => fetchDevices(true)}
+                    className="clear-search-button"
+                  >
+                    Try Again
+                  </button>
+                  <a
+                    href={`${import.meta.env.VITE_API_URL}/health`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="health-check-link"
+                  >
+                    Check Backend Health
+                  </a>
+                </div>
               </div>
             ) : filteredDevices.length > 0 ? (
               <div className="devices-grid">
                 {filteredDevices.map(device => (
                   <DeviceCard 
-                    key={device._id || device.deviceId} 
+                    key={device.id || device.deviceId} 
                     device={device} 
                     refresh={fetchDevices} 
                   />
@@ -406,7 +546,7 @@ export default function Dashboard() {
                 <p className="empty-state-description">
                   {searchTerm 
                     ? `No devices match your search for "${searchTerm}"`
-                    : 'No devices are currently registered in the system.'
+                    : 'No devices are currently registered in the system. Register devices first.'
                   }
                 </p>
                 {searchTerm && (
@@ -440,7 +580,7 @@ export default function Dashboard() {
             <div className="footer-stats">
               <div className="footer-stat">
                 <Clock size={16} />
-                <span>Auto-refresh: <strong>8s</strong></span>
+                <span>Auto-refresh: <strong>30s</strong></span>
               </div>
               <div className="footer-stat">
                 <Cpu size={16} />
